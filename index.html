@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic QR Code Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+        .qr-animation {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-[#f0f7f7] min-h-screen">
+    <div id="authContainer" class="container mx-auto px-4 py-8">
+        <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-center text-[#2b6777] mb-6">Dynamic QR Code Generator</h2>
+            
+            <div class="space-y-4">
+                <div class="flex justify-center space-x-4">
+                    <button onclick="setAuthMethod('email')" id="emailBtn" class="px-4 py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition">Email Login</button>
+                    <button onclick="setAuthMethod('phone')" id="phoneBtn" class="px-4 py-2 bg-[#c8d8e4] text-[#2b6777] rounded-lg hover:bg-[#a9c1d1] transition">Phone Login</button>
+                </div>
+                
+                <div id="authForm" class="space-y-4">
+                    <!-- Auth form will be injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainContainer" class="container mx-auto px-4 py-8 hidden">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold text-[#2b6777]">Dynamic QR Generator</h1>
+                <button onclick="logout()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="bi bi-box-arrow-right mr-1"></i> Logout
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h2 class="text-2xl font-bold text-[#2b6777]">Create QR Code</h2>
+                        <div class="space-y-2">
+                            <label for="qrType" class="block text-gray-700">Content Type</label>
+                            <select id="qrType" onchange="changeQrType()" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]">
+                                <option value="text">Text</option>
+                                <option value="url">URL</option>
+                                <option value="email">Email</option>
+                                <option value="phone">Phone</option>
+                                <option value="sms">SMS</option>
+                                <option value="wifi">WiFi</option>
+                            </select>
+                            
+                            <div id="dynamicFields">
+                                <!-- Dynamic input fields based on QR type will be inserted here -->
+                            </div>
+                            
+                            <label for="qrSize" class="block text-gray-700">QR Code Size</label>
+                            <select id="qrSize" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]">
+                                <option value="150">Small (150x150)</option>
+                                <option value="250" selected>Medium (250x250)</option>
+                                <option value="350">Large (350x350)</option>
+                            </select>
+                        </div>
+                        <button onclick="generateQR()" class="w-full py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition">
+                            <i class="bi bi-qr-code mr-2"></i>Generate QR Code
+                        </button>
+                    </div>
+                    
+                    <div class="flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg">
+                        <div id="qrOutput" class="flex items-center justify-center min-h-[250px]">
+                            <p class="text-gray-500">Your QR code will appear here</p>
+                        </div>
+                        <div id="qrActions" class="mt-4 flex gap-2 hidden">
+                            <button onclick="downloadQR()" class="px-4 py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition">
+                                <i class="bi bi-download mr-1"></i> Download
+                            </button>
+                            <button onclick="shareQR()" class="px-4 py-2 bg-[#52ab98] text-white rounded-lg hover:bg-[#429080] transition">
+                                <i class="bi bi-share mr-1"></i> Share
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="historyContainer" class="bg-white rounded-xl shadow-lg p-6 mb-8 hidden">
+                <h3 class="text-xl font-bold text-[#2b6777] mb-4">Recently Generated QR Codes</h3>
+                <div id="qrHistory" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- QR history will be populated here -->
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-[#2b6777] mb-4">Choose Your Plan</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="border rounded-lg p-6 hover:shadow-lg transition relative">
+                        <span class="absolute -top-2 -right-2 bg-[#2b6777] text-white text-xs font-bold px-2 py-1 rounded-full">CURRENT</span>
+                        <h4 class="text-lg font-semibold mb-2">Basic Plan</h4>
+                        <p class="font-bold text-2xl text-[#2b6777] mb-4">Free</p>
+                        <ul class="space-y-2 mb-4">
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Basic QR Code Generation</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Standard Sizes</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Download as PNG</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> 5 QR Codes History</li>
+                        </ul>
+                        <button disabled class="w-full py-2 bg-gray-300 text-gray-700 rounded-lg cursor-not-allowed">Current Plan</button>
+                    </div>
+                    <div class="border rounded-lg p-6 hover:shadow-lg transition bg-[#f2f9f9]">
+                        <h4 class="text-lg font-semibold mb-2">Premium Plan</h4>
+                        <p class="font-bold text-2xl text-[#2b6777] mb-4">$9.99/month</p>
+                        <ul class="space-y-2 mb-4">
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> All Basic Features</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Custom Colors & Logos</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Analytics & Tracking</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Bulk Generation</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Advanced Formats (vCard, Calendar)</li>
+                            <li><i class="bi bi-check-circle text-green-500 mr-2"></i> Unlimited QR History</li>
+                        </ul>
+                        <button onclick="upgradeToPremium()" class="w-full py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition">Upgrade Now</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAuthMethod = 'email';
+        let verificationCode = '';
+        let qrHistory = [];
+        
+        function setAuthMethod(method) {
+            currentAuthMethod = method;
+            
+            // Update button styles
+            if (method === 'email') {
+                document.getElementById('emailBtn').className = 'px-4 py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition';
+                document.getElementById('phoneBtn').className = 'px-4 py-2 bg-[#c8d8e4] text-[#2b6777] rounded-lg hover:bg-[#a9c1d1] transition';
+            } else {
+                document.getElementById('emailBtn').className = 'px-4 py-2 bg-[#c8d8e4] text-[#2b6777] rounded-lg hover:bg-[#a9c1d1] transition';
+                document.getElementById('phoneBtn').className = 'px-4 py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition';
+            }
+            
+            const authForm = document.getElementById('authForm');
+            authForm.innerHTML = `
+                <input type="${method === 'email' ? 'email' : 'tel'}" 
+                    id="authInput" 
+                    placeholder="${method === 'email' ? 'Enter your email' : 'Enter your phone number'}"
+                    class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]">
+                <button onclick="sendOTP()" 
+                    class="w-full py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition">
+                    <i class="bi bi-send mr-1"></i> Send OTP
+                </button>
+            `;
+        }
+
+        function sendOTP() {
+            const authInput = document.getElementById('authInput').value;
+            if (!authInput) {
+                showAlert('Please enter your ' + currentAuthMethod, 'error');
+                return;
+            }
+            
+            if (currentAuthMethod === 'email' && !authInput.includes('@')) {
+                showAlert('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            if (currentAuthMethod === 'phone' && authInput.length < 10) {
+                showAlert('Please enter a valid phone number', 'error');
+                return;
+            }
+
+            // Simulate OTP generation
+            verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            const authForm = document.getElementById('authForm');
+            authForm.innerHTML = `
+                <div class="text-center p-3 bg-blue-50 text-blue-700 rounded-lg mb-4">
+                    <i class="bi bi-info-circle"></i> OTP sent to ${maskIdentity(authInput)}
+                </div>
+                <div class="text-center text-sm text-gray-500 mb-4">Enter the 6-digit code sent to your ${currentAuthMethod}</div>
+                <div class="flex justify-center gap-2 mb-4">
+                    <input type="text" inputmode="numeric" maxlength="1" class="w-10 h-12 text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] otp-input">
+                    <input type="text" inputmode="numeric" maxlength="1" class="w-10 h-12 text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] otp-input">
+                    <input type="text" inputmode="numeric" maxlength="1" class="w-10 h-12 text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] otp-input">
+                    <input type="text" inputmode="numeric" maxlength="1" class="w-10 h-12 text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] otp-input">
+                    <input type="text" inputmode="numeric" maxlength="1" class="w-10 h-12 text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] otp-input">
+                    <input type="text" inputmode="numeric" maxlength="1" class="w-10 h-12 text-center border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] otp-input">
+                </div>
+                <div class="flex justify-between items-center mb-4">
+                    <button onclick="setAuthMethod('${currentAuthMethod}')" class="text-[#2b6777]">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button onclick="resendOTP()" class="text-[#2b6777]">
+                        Resend OTP
+                    </button>
+                </div>
+                <button onclick="verifyOTP()" 
+                    class="w-full py-2 bg-[#2b6777] text-white rounded-lg hover:bg-[#1e4f5f] transition">
+                    <i class="bi bi-check-circle mr-1"></i> Verify OTP
+                </button>
+            `;
+
+            // Add event listeners to OTP inputs
+            const otpInputs = document.querySelectorAll('.otp-input');
+            otpInputs.forEach((input, index) => {
+                input.addEventListener('input', (e) => {
+                    if (e.target.value && index < otpInputs.length - 1) {
+                        otpInputs[index + 1].focus();
+                    }
+                });
+                
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                        otpInputs[index - 1].focus();
+                    }
+                });
+            });
+
+            // In a real application, you would send the OTP to the user's email or phone
+            console.log('Generated OTP:', verificationCode);
+            
+            // Show OTP in alert for demo purposes
+            showAlert(`Use OTP: ${verificationCode} (Demo Only)`, 'info');
+        }
+        
+        function maskIdentity(value) {
+            if (currentAuthMethod === 'email') {
+                const parts = value.split('@');
+                const name = parts[0];
+                const masked = name.substring(0, 2) + '***' + name.substring(name.length - 2);
+                return masked + '@' + parts[1];
+            } else {
+                return '***-***-' + value.substring(value.length - 4);
+            }
+        }
+        
+        function resendOTP() {
+            // Simulate OTP regeneration
+            verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            console.log('Regenerated OTP:', verificationCode);
+            showAlert(`New OTP: ${verificationCode} (Demo Only)`, 'info');
+        }
+
+        function verifyOTP() {
+            const otpInputs = document.querySelectorAll('.otp-input');
+            let enteredOTP = '';
+            
+            otpInputs.forEach(input => {
+                enteredOTP += input.value;
+            });
+            
+            if (enteredOTP.length !== 6) {
+                showAlert('Please enter the complete 6-digit OTP', 'error');
+                return;
+            }
+            
+            // For demo purposes, accept correct OTP or "123456" as valid
+            if (enteredOTP === verificationCode || enteredOTP === "123456") {
+                showAlert('Login successful!', 'success');
+                document.getElementById('authContainer').classList.add('hidden');
+                document.getElementById('mainContainer').classList.remove('hidden');
+                
+                // Initialize the dynamic fields
+                changeQrType();
+                
+                // Show history container if there are items
+                updateHistoryDisplay();
+            } else {
+                showAlert('Invalid OTP. Please try again.', 'error');
+            }
+        }
+        
+        function logout() {
+            document.getElementById('authContainer').classList.remove('hidden');
+            document.getElementById('mainContainer').classList.add('hidden');
+            setAuthMethod('email');
+        }
+
+        function changeQrType() {
+            const qrType = document.getElementById('qrType').value;
+            const dynamicFields = document.getElementById('dynamicFields');
+            
+            // Clear previous fields
+            dynamicFields.innerHTML = '';
+            
+            switch(qrType) {
+                case 'text':
+                    dynamicFields.innerHTML = `
+                        <label for="qrContent" class="block text-gray-700">Text Content</label>
+                        <textarea id="qrContent" placeholder="Enter your text here" rows="3" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]"></textarea>
+                    `;
+                    break;
+                case 'url':
+                    dynamicFields.innerHTML = `
+                        <label for="qrContent" class="block text-gray-700">URL</label>
+                        <input type="url" id="qrContent" placeholder="https://example.com" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]">
+                    `;
+                    break;
+                case 'email':
+                    dynamicFields.innerHTML = `
+                        <label for="emailAddress" class="block text-gray-700">Email Address</label>
+                        <input type="email" id="emailAddress" placeholder="example@email.com" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] mb-2">
+                        <label for="emailSubject" class="block text-gray-700">Subject (Optional)</label>
+                        <input type="text" id="emailSubject" placeholder="Email Subject" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] mb-2">
+                        <label for="emailBody" class="block text-gray-700">Body (Optional)</label>
+                        <textarea id="emailBody" placeholder="Email content..." rows="2" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]"></textarea>
+                    `;
+                    break;
+                case 'phone':
+                    dynamicFields.innerHTML = `
+                        <label for="qrContent" class="block text-gray-700">Phone Number</label>
+                        <input type="tel" id="qrContent" placeholder="+1234567890" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]">
+                    `;
+                    break;
+                case 'sms':
+                    dynamicFields.innerHTML = `
+                        <label for="phoneNumber" class="block text-gray-700">Phone Number</label>
+                        <input type="tel" id="phoneNumber" placeholder="+1234567890" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] mb-2">
+                        <label for="smsMessage" class="block text-gray-700">Message (Optional)</label>
+                        <textarea id="smsMessage" placeholder="Your message..." rows="2" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]"></textarea>
+                    `;
+                    break;
+                case 'wifi':
+                    dynamicFields.innerHTML = `
+                        <label for="ssid" class="block text-gray-700">Network Name (SSID)</label>
+                        <input type="text" id="ssid" placeholder="WiFi Network Name" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] mb-2">
+                        <label for="password" class="block text-gray-700">Password</label>
+                        <input type="text" id="password" placeholder="WiFi Password" 
+                            class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777] mb-2">
+                        <label for="encryption" class="block text-gray-700">Encryption</label>
+                        <select id="encryption" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2b6777]">
+                            <option value="WPA">WPA/WPA2</option>
+                            <option value="WEP">WEP</option>
+                            <option value="nopass">None</option>
+                        </select>
+                    `;
+                    break;
+            }
+        }
+
+        function generateQR() {
+            const qrType = document.getElementById('qrType').value;
+            const size = document.getElementById('qrSize').value;
+            let content = '';
+            
+            // Build content based on QR type
+            switch(qrType) {
+                case 'text':
+                case 'url':
+                case 'phone':
+                    content = document.getElementById('qrContent').value;
+                    if (!content) {
+                        showAlert('Please enter content for the QR code', 'error');
+                        return;
+                    }
+                    if (qrType === 'phone') {
+                        content = 'tel:' + content;
+                    }
+                    break;
+                case 'email':
+                    const email = document.getElementById('emailAddress').value;
+                    const subject = document.getElementById('emailSubject').value;
+                    const body = document.getElementById('emailBody').value;
+                    
+                    if (!email) {
+                        showAlert('Please enter an email address', 'error');
+                        return;
+                    }
+                    
+                    content = 'mailto:' + email;
+                    if (subject) content += '?subject=' + encodeURIComponent(subject);
+                    if (body) content += (subject ? '&' : '?') + 'body=' + encodeURIComponent(body);
+                    break;
+                case 'sms':
+                    const phone = document.getElementById('phoneNumber').value;
+                    const message = document.getElementById('smsMessage').value;
+                    
+                    if (!phone) {
+                        showAlert('Please enter a phone number', 'error');
+                        return;
+                    }
+                    
+                    content = 'smsto:' + phone;
+                    if (message) content += ':' + message;
+                    break;
+                case 'wifi':
+                    const ssid = document.getElementById('ssid').value;
+                    const password = document.getElementById('password').value;
+                    const encryption = document.getElementById('encryption').value;
+                    
+                    if (!ssid) {
+                        showAlert('Please enter a network name (SSID)', 'error');
+                        return;
+                    }
+                    
+                    content = 'WIFI:S:' + ssid + ';T:' + encryption + ';P:' + password + ';;';
+                    break;
+            }
+
+            // Show loading state
+            const qrOutput = document.getElementById('qrOutput');
+            qrOutput.innerHTML = '<p class="loading text-gray-500">Generating QR code</p>';
+            
+            // Simulate a brief loading delay
+            setTimeout(() => {
+                try {
+                    const qr = qrcode(0, 'L');
+                    qr.addData(content);
+                    qr.make();
+                    
+                    qrOutput.innerHTML = `<div class="qr-animation">${qr.createImgTag(size/25)}</div>`;
+                    document.getElementById('qrActions').classList.remove('hidden');
+                    
+                    // Add to history
+                    addToHistory(content, qr.createImgTag(4));
+                } catch (e) {
+                    qrOutput.innerHTML = '<p class="text-red-500">Error generating QR code. Please try again.</p>';
+                    document.getElementById('qrActions').classList.add('hidden');
+                    console.error(e);
+                }
+            }, 800);
+        }
+
+        function downloadQR() {
+            const qrImage = document.querySelector('#qrOutput img');
+            if (!qrImage) {
+                showAlert('No QR code to download', 'error');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = 'dynamic-qrcode.png';
+            link.href = qrImage.src;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showAlert('QR Code downloaded successfully!', 'success');
+        }
+        
+        function shareQR() {
+            const qrImage = document.querySelector('#qrOutput img');
+            if (!qrImage) {
+                showAlert('No QR code to share', 'error');
+                return;
+            }
+            
+            // If Web Share API is available
+            if (navigator.share) {
+                fetch(qrImage.src)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], 'dynamic-qrcode.png', { type: 'image/png' });
+                        navigator.share({
+                            title: 'My Dynamic QR Code',
+                            text: 'Check out this QR code I generated!',
+                            files: [file]
+                        })
+                        .then(() => showAlert('Shared successfully!', 'success'))
+                        .catch(err => {
+                            console.error('Error sharing:', err);
+                            showAlert('Could not share QR code', 'error');
+                        });
+                    });
+            } else {
+                showAlert('Web Share API not supported on this browser', 'error');
+            }
+        }
+        
+        function addToHistory(content, imgTag) {
+            // Limit history to 5 items for free plan
+            if (qrHistory.length >= 5) {
+                qrHistory.pop();
+            }
+            
+            const date = new Date().toLocaleString();
+            qrHistory.unshift({ content, imgTag, date });
+            
+            updateHistoryDisplay();
+        }
+        
+        function updateHistoryDisplay() {
+            const historyContainer = document.getElementById('historyContainer');
+            const qrHistoryElement = document.getElementById('qrHistory');
+            
+            if (qrHistory.length > 0) {
+                historyContainer.classList.remove('hidden');
+                qrHistoryElement.innerHTML = '';
+                
+                qrHistory.forEach((item, index) => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'border rounded-lg p-3 hover:shadow-md transition cursor-pointer';
+                    historyItem.innerHTML = `
+                        <div class="flex justify-center mb-2">${item.imgTag}</div>
+                        <p class="text-xs text-gray-500 truncate">${item.content}</p>
+                        <p class="text-xs text-gray-400 mt-1">${item.date}</p>
+                    `;
+                    historyItem.onclick = () => loadFromHistory(index);
+                    qrHistoryElement.appendChild(historyItem);
+                });
+            } else {
+                historyContainer.classList.add('hidden');
+            }
+        }
+        
+        function loadFromHistory(index) {
+            const item = qrHistory[index];
+            if (item) {
+                const qrOutput = document.getElementById('qrOutput');
+                qrOutput.innerHTML = `<div class="qr-animation">${item.imgTag}</div>`;
+                document.getElementById('qrActions').classList.remove('hidden');
+                showAlert('QR code loaded from history', 'info');
+            }
+        }
+        
+        function upgradeToPremium() {
+            showAlert('Upgrade feature is not available in this demo', 'info');
+        }
+        
+        function showAlert(message, type) {
+            // Remove any existing alerts
+            const existingAlert = document.getElementById('alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            // Create alert element
+            const alert = document.createElement('div');
+            alert.id = 'alert';
+            alert.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg flex items-center space-x-2 ${
+                type === 'error' ? 'bg-red-100 text-red-700' :
+                type === 'success' ? 'bg-green-100 text-green-700' :
+                'bg-blue-100 text-blue-700'
+            }`;
+            
+            const icon = document.createElement('i');
+            icon.className = `bi ${
+                type === 'error' ? 'bi-exclamation-circle' :
+                type === 'success' ? 'bi-check-circle' :
+                'bi-info-circle'
+            }`;
+            
+            const text = document.createElement('span');
+            text.textContent = message;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'ml-4 text-gray-500 hover:text-gray-700';
+            closeBtn.innerHTML = '<i class="bi bi-x"></i>';
+            closeBtn.onclick = () => alert.remove();
+            
+            alert.appendChild(icon);
+            alert.appendChild(text);
+            alert.appendChild(closeBtn);
+            document.body.appendChild(alert);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (document.body.contains(alert)) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+        
+        // Initialize with email auth form on page load
+        setAuthMethod('email');
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
